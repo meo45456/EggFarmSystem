@@ -1,12 +1,3 @@
-getgenv().EggFarmConfig = {
-	["CheckTicket"] = false,
-	["CheckMagicBean"] = true,
-	["CheckStarEgg"] = false,
-	["TargetTicket"] = 13,
-	["TargetMagicBean"] = 0,
-	["TargetStarEgg"] = 20,
-}
-
 -- 🧠 ตั้งค่า
 local CHECK_INTERVAL = 20 -- หน่วงเวลาการตรวจแต่ละรอบ (วินาที)
 local DEBUG_MODE = false  -- true = แสดง log เพิ่ม / false = ปิด log เพื่อลดภาระ
