@@ -1,6 +1,10 @@
--- 🧠 ตั้งค่า
-local CHECK_INTERVAL = 20 -- หน่วงเวลาการตรวจแต่ละรอบ (วินาที)
-local DEBUG_MODE = false  -- true = แสดง log เพิ่ม / false = ปิด log เพื่อลดภาระ
+-- 🧠 ตั้งค่าเบื้องต้นจาก Loader
+local cfg = getgenv().EggFarmConfig or {}
+local settings = getgenv().EggFarmSettings or {}
+
+local CHECK_INTERVAL = settings.CheckInterval or 20 -- หน่วงเวลาตรวจแต่ละรอบ
+local DEBUG_MODE = settings.EnableLog or false      -- เปิด log เพิ่ม
+local RETRY_ATTEMPTS = 3                            -- จำนวนครั้ง retry ถ้า Horst ส่งไม่สำเร็จ
 
 -- 🧩 ฟังก์ชัน log แบบเบาเครื่อง
 local function log(...)
@@ -9,6 +13,7 @@ local function log(...)
 	end
 end
 
+-- 🧩 Service พื้นฐาน
 local Players = game:GetService("Players")
 local GuiService = game:GetService("GuiService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -23,7 +28,7 @@ local function openEggMenu()
 	if menuOpened or noInteractDup then return end
 	noInteractDup = true
 	xpcall(function()
-		local tab = PlayerGui.ScreenGui.Menus.ChildTabs:FindFirstChild("Eggs Tab")
+		local tab = PlayerGui:FindFirstChild("ScreenGui") and PlayerGui.ScreenGui.Menus.ChildTabs:FindFirstChild("Eggs Tab")
 		if tab then
 			GuiService.SelectedObject = tab
 			task.wait(0.05)
@@ -33,6 +38,8 @@ local function openEggMenu()
 			GuiService.SelectedObject = nil
 			menuOpened = true
 			log("เปิดแท็บ Eggs สำเร็จ")
+		else
+			warn("[EggFarm] ⚠️ ไม่พบแท็บ Eggs Tab")
 		end
 		noInteractDup = false
 	end, function(err)
@@ -48,36 +55,45 @@ local function extractNumber(text)
 	return tonumber(number) or 0
 end
 
--- 🟢 รอให้ Horst พร้อมก่อนเริ่ม
-local function waitForHorst(timeout)
+-- 🟢 รอให้ Horst พร้อมก่อนเริ่ม (ไม่มี timeout)
+local function waitForHorstBlocking()
 	local t = 0
-	while type(_G.Horst_AccountChangeDone) ~= "function" and t < timeout do
-		if DEBUG_MODE then warn(string.format("[EggFarm] ⏳ รอ Horst โหลด... (%d/%d)", t, timeout)) end
-		t += 1
+	while type(_G.Horst_AccountChangeDone) ~= "function" do
 		task.wait(1)
+		t += 1
+		if DEBUG_MODE then
+			warn(("[EggFarm] ⏳ รอ Horst Core โหลด... (%ds)"):format(t))
+		end
 	end
+	print("[EggFarm] ✅ Horst พร้อมแล้ว")
+end
 
-	if type(_G.Horst_AccountChangeDone) == "function" then
-		print("[EggFarm] ✅ Horst พร้อมแล้ว")
-		return true
-	else
-		warn("[EggFarm] ❌ Timeout: Horst ยังไม่โหลดหลัง", timeout, "วินาที")
-		return false
+-- 🟢 ระบบส่ง DONE แบบ Retry 3 ครั้ง
+local function sendDone()
+	for i = 1, RETRY_ATTEMPTS do
+		local ok, err = pcall(_G.Horst_AccountChangeDone)
+		if ok then
+			print("[EggFarm] ✅ DONE สำเร็จ (ครั้งที่ " .. i .. ")")
+			return true
+		else
+			warn("[EggFarm] ❌ ส่ง DONE ล้มเหลว ครั้งที่", i, ":", err)
+			task.wait(2)
+		end
 	end
+	return false
 end
 
 -- 🟢 เริ่มระบบหลัก
 task.spawn(function()
 	pcall(function()
-		if not waitForHorst(30) then
-			warn("[EggFarm] ❌ ยกเลิกการทำงาน เพราะ Horst ยังไม่พร้อม")
-			return
-		end
-
+		waitForHorstBlocking()
 		openEggMenu()
+		task.wait(0.5) -- เผื่อ GUI update ช้า
 
 		while true do
-			local eggRowsPath = PlayerGui.ScreenGui.Menus.Children.Eggs.Content:FindFirstChild("EggRows")
+			local eggRowsPath = PlayerGui:FindFirstChild("ScreenGui") 
+				and PlayerGui.ScreenGui.Menus.Children.Eggs.Content:FindFirstChild("EggRows")
+
 			if not eggRowsPath then
 				openEggMenu()
 				task.wait(CHECK_INTERVAL)
@@ -105,7 +121,6 @@ task.spawn(function()
 
 			log(string.format("Ticket=%d | Bean=%d | StarEgg=%d", ticketNumber, magicBeanNumber, starEggNumber))
 
-			local cfg = getgenv().EggFarmConfig
 			local allConditionsMet = true
 
 			if cfg["CheckTicket"] and ticketNumber ~= cfg["TargetTicket"] then
@@ -126,13 +141,8 @@ task.spawn(function()
 			-- ✅ ถ้าครบเงื่อนไข ส่ง Done
 			if allConditionsMet then
 				print("[EggFarm] 🎯 เงื่อนไขครบ เตรียมส่ง DONE")
-
-				local ok, result = pcall(_G.Horst_AccountChangeDone)
-				if ok then
-					print("[EggFarm] ✅ ส่งสถานะ DONE สำเร็จ!")
-				else
-					warn("[EggFarm] ❌ ส่งสถานะ DONE ไม่สำเร็จ:", result)
-				end
+				task.wait(1) -- เผื่อ GUI delay
+				sendDone()
 				break
 			end
 
