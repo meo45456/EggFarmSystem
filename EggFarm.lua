@@ -23,24 +23,57 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local noInteractDup = false
 local menuOpened = false
 
--- 🟢 ฟังก์ชันเปิดแท็บ Eggs (ใช้เฉพาะครั้งแรก)
+-- 🟢 ฟังก์ชันเปิดแท็บ Eggs (แบบรอจนเปิดแน่)
 local function openEggMenu()
-	if menuOpened or noInteractDup then return end
+	if noInteractDup then return end
 	noInteractDup = true
 	xpcall(function()
-		local tab = PlayerGui:FindFirstChild("ScreenGui") and PlayerGui.ScreenGui.Menus.ChildTabs:FindFirstChild("Eggs Tab")
-		if tab then
-			GuiService.SelectedObject = tab
-			task.wait(0.05)
-			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
-			task.wait(0.05)
-			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
-			GuiService.SelectedObject = nil
-			menuOpened = true
-			log("เปิดแท็บ Eggs สำเร็จ")
-		else
-			warn("[EggFarm] ⚠️ ไม่พบแท็บ Eggs Tab")
+		local tab = nil
+		local tries = 0
+
+		repeat
+			tab = PlayerGui:FindFirstChild("ScreenGui")
+				and PlayerGui.ScreenGui.Menus.ChildTabs:FindFirstChild("Eggs Tab")
+			task.wait(0.5)
+			tries += 1
+			if tries % 5 == 0 then
+				log("[EggFarm] ⏳ รอเจอปุ่ม Eggs Tab... (" .. tries .. " รอบ)")
+			end
+		until tab or tries >= 30
+
+		if not tab then
+			warn("[EggFarm] ❌ หาแท็บ Eggs ไม่เจอหลังรอ 15 วิ")
+			noInteractDup = false
+			return
 		end
+
+		-- กดเข้าเมนู Eggs
+		GuiService.SelectedObject = tab
+		task.wait(0.05)
+		VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+		task.wait(0.05)
+		VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+		GuiService.SelectedObject = nil
+
+		-- ✅ รอจนกว่า EggRows จะโหลดจริง ๆ
+		local eggRows = nil
+		local waitCount = 0
+		repeat
+			eggRows = PlayerGui.ScreenGui.Menus.Children.Eggs.Content:FindFirstChild("EggRows")
+			task.wait(0.5)
+			waitCount += 1
+			if waitCount % 4 == 0 then
+				log("[EggFarm] ⏳ รอกระเป๋า Eggs โหลด... (" .. waitCount .. ")")
+			end
+		until eggRows or waitCount >= 40
+
+		if eggRows then
+			print("[EggFarm] ✅ เปิดกระเป๋า Eggs สำเร็จ (พร้อมใช้งาน)")
+			menuOpened = true
+		else
+			warn("[EggFarm] ❌ โหลดกระเป๋า Eggs ไม่สำเร็จหลังรอ 20 วิ")
+		end
+
 		noInteractDup = false
 	end, function(err)
 		warn("[EggFarm] ⚠️ openEggMenu error:", err)
