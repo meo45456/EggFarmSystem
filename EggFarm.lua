@@ -23,7 +23,7 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local noInteractDup = false
 local menuOpened = false
 
--- 🟢 เปิดเมนู Eggs (ล็อกโฟกัสให้แน่ใจก่อนกด Enter)
+-- 🟢 เปิดเมนู Eggs (ค้างโฟกัสก่อนและหลัง Enter)
 local function openEggMenu()
 	if noInteractDup then return end
 	noInteractDup = true
@@ -32,7 +32,7 @@ local function openEggMenu()
 		local success = false
 
 		for attempt = 1, 3 do
-			log("🔒 ล็อกโฟกัส Eggs Tab รอบที่", attempt)
+			log("🔒 ล็อกและค้างโฟกัส Eggs Tab รอบที่", attempt)
 
 			-- 1️⃣ รอ Menus พร้อม
 			local menus
@@ -61,10 +61,10 @@ local function openEggMenu()
 				continue
 			end
 
-			-- 3️⃣ ตั้ง SelectedObject
+			-- 3️⃣ ล็อกโฟกัส
 			GuiService.SelectedObject = eggsTab
 
-			-- 4️⃣ ยืนยันว่าล็อกติดจริง (ไม่ใช่แค่ตั้งค่า)
+			-- 4️⃣ ยืนยันว่าล็อกติดจริง
 			local locked = false
 			for i = 1, 20 do
 				if GuiService.SelectedObject == eggsTab then
@@ -75,23 +75,26 @@ local function openEggMenu()
 			end
 
 			if not locked then
-				warn("[EggFarm] ⚠️ โฟกัสยังไม่ล็อก")
-				GuiService.SelectedObject = nil
+				warn("[EggFarm] ⚠️ โฟกัสไม่ล็อก")
 				task.wait(1)
 				continue
 			end
 
-			-- 5️⃣ ค้างโฟกัสให้ UI รับรู้
-			task.wait(0.3)
+			-- 🔴 5️⃣ ค้างโฟกัส “ก่อน” กด Enter (จุดสำคัญ)
+			task.wait(0.4)
 
-			-- 6️⃣ กด Enter หลังจากยืนยันแล้วเท่านั้น
+			-- 6️⃣ กด Enter
 			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
-			task.wait(0.15)
+			task.wait(0.2)
 			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
 
+			-- 🔴 7️⃣ ค้างโฟกัส “หลัง” กด Enter (ห้ามปล่อยทันที)
+			task.wait(0.4)
+
+			-- 8️⃣ ตอนนี้ค่อยปล่อยโฟกัส
 			GuiService.SelectedObject = nil
 
-			-- 7️⃣ ตรวจว่า Eggs เปิดจริง (EggRows โผล่)
+			-- 9️⃣ ตรวจว่า Eggs เปิดจริง
 			local eggRows
 			for i = 1, 40 do
 				eggRows = menus.Children
@@ -106,17 +109,17 @@ local function openEggMenu()
 			end
 
 			if success then
-				print("[EggFarm] ✅ ล็อกโฟกัสแล้วเปิด Eggs สำเร็จ")
+				print("[EggFarm] ✅ เปิด Eggs สำเร็จ (ค้างโฟกัสเรียบร้อย)")
 				menuOpened = true
 				break
 			else
-				warn("[EggFarm] ⚠️ Enter ไม่ติด ลองใหม่")
+				warn("[EggFarm] ⚠️ Enter ติดแต่ UI ยังไม่ขึ้น ลองใหม่")
 				task.wait(1.5)
 			end
 		end
 
 		if not success then
-			warn("[EggFarm] ❌ เปิด Eggs ไม่สำเร็จหลังลองครบ")
+			warn("[EggFarm] ❌ เปิด Eggs ไม่สำเร็จ")
 		end
 
 		noInteractDup = false
