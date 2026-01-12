@@ -23,7 +23,7 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local noInteractDup = false
 local menuOpened = false
 
--- 🟢 ฟังก์ชันเปิดแท็บ Eggs (โหมดชัวร์ / ค่อยเป็นค่อยไป)
+-- 🟢 เปิดเมนู Eggs (ล็อกโฟกัสให้แน่ใจก่อนกด Enter)
 local function openEggMenu()
 	if noInteractDup then return end
 	noInteractDup = true
@@ -31,16 +31,16 @@ local function openEggMenu()
 	task.spawn(function()
 		local success = false
 
-		for attempt = 1, 3 do -- retry เปิดเมนูทั้งชุด
-			log("🔁 พยายามเปิด Eggs รอบที่", attempt)
+		for attempt = 1, 3 do
+			log("🔒 ล็อกโฟกัส Eggs Tab รอบที่", attempt)
 
-			-- 1️⃣ รอ ScreenGui และ Menus ให้พร้อม
-			local screenGui, menus
-			for i = 1, 20 do
-				screenGui = PlayerGui:FindFirstChild("ScreenGui")
-				menus = screenGui and screenGui:FindFirstChild("Menus")
+			-- 1️⃣ รอ Menus พร้อม
+			local menus
+			for i = 1, 30 do
+				local sg = PlayerGui:FindFirstChild("ScreenGui")
+				menus = sg and sg:FindFirstChild("Menus")
 				if menus then break end
-				task.wait(0.3)
+				task.wait(0.25)
 			end
 			if not menus then
 				warn("[EggFarm] ❌ Menus ยังไม่พร้อม")
@@ -50,10 +50,10 @@ local function openEggMenu()
 
 			-- 2️⃣ หา Eggs Tab
 			local eggsTab
-			for i = 1, 20 do
+			for i = 1, 30 do
 				eggsTab = menus.ChildTabs:FindFirstChild("Eggs Tab")
 				if eggsTab then break end
-				task.wait(0.3)
+				task.wait(0.25)
 			end
 			if not eggsTab then
 				warn("[EggFarm] ❌ หา Eggs Tab ไม่เจอ")
@@ -61,21 +61,42 @@ local function openEggMenu()
 				continue
 			end
 
-			-- 3️⃣ เลือกแท็บ (กด Enter แบบช้า ๆ)
+			-- 3️⃣ ตั้ง SelectedObject
 			GuiService.SelectedObject = eggsTab
-			task.wait(0.15)
+
+			-- 4️⃣ ยืนยันว่าล็อกติดจริง (ไม่ใช่แค่ตั้งค่า)
+			local locked = false
+			for i = 1, 20 do
+				if GuiService.SelectedObject == eggsTab then
+					locked = true
+					break
+				end
+				task.wait(0.1)
+			end
+
+			if not locked then
+				warn("[EggFarm] ⚠️ โฟกัสยังไม่ล็อก")
+				GuiService.SelectedObject = nil
+				task.wait(1)
+				continue
+			end
+
+			-- 5️⃣ ค้างโฟกัสให้ UI รับรู้
+			task.wait(0.3)
+
+			-- 6️⃣ กด Enter หลังจากยืนยันแล้วเท่านั้น
 			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
 			task.wait(0.15)
 			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+
 			GuiService.SelectedObject = nil
 
-			-- 4️⃣ รอ Content Eggs โหลดจริง
+			-- 7️⃣ ตรวจว่า Eggs เปิดจริง (EggRows โผล่)
 			local eggRows
 			for i = 1, 40 do
 				eggRows = menus.Children
-					:FindFirstChild("Eggs")
-					and menus.Children.Eggs.Content
-					:FindFirstChild("EggRows")
+					and menus.Children:FindFirstChild("Eggs")
+					and menus.Children.Eggs.Content:FindFirstChild("EggRows")
 
 				if eggRows and #eggRows:GetChildren() > 0 then
 					success = true
@@ -85,17 +106,17 @@ local function openEggMenu()
 			end
 
 			if success then
-				print("[EggFarm] ✅ เปิดเมนู Eggs สำเร็จ (ยืนยัน EggRows แล้ว)")
+				print("[EggFarm] ✅ ล็อกโฟกัสแล้วเปิด Eggs สำเร็จ")
 				menuOpened = true
 				break
 			else
-				warn("[EggFarm] ⚠️ เปิด Eggs ไม่สำเร็จ รอบนี้")
+				warn("[EggFarm] ⚠️ Enter ไม่ติด ลองใหม่")
 				task.wait(1.5)
 			end
 		end
 
 		if not success then
-			warn("[EggFarm] ❌ เปิดเมนู Eggs ล้มเหลวทุกครั้ง")
+			warn("[EggFarm] ❌ เปิด Eggs ไม่สำเร็จหลังลองครบ")
 		end
 
 		noInteractDup = false
